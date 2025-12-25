@@ -4,7 +4,12 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss'],
   tailwindcss: {
-    cssPath: 'assets/css/main.css',
+    cssPath: [
+      '~/assets/css/main.css',
+      {
+        injectPosition: 'last'
+      },
+    ],
   },
   app: {
     baseURL: '/shiyu-song-list/', // 例如 '/my-music-list/'，如果是主域名則用 '/'
