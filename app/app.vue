@@ -86,64 +86,89 @@ div(class="min-h-screen bg-blue-50/80 text-slate-900 py-6 px-4 sm:px-6 font-sans
 </template>
 
 <script setup>
-import Papa from 'papaparse' // 記得 npm install papaparse
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRPNWnxfDY4g6QEACTULQzC1HHv8kmvUDvOX2lLHFQ9Zqo6_7QEkJe0hWc7WNUWZmBbVFASKM_L0iB2/pub?gid=1069936388&single=true&output=csv'
+import Papa from 'papaparse'
 
-const { data: rawCsv } = await useFetch(SHEET_URL)
+// 1. 填入你提供的 CSV 連結，並在後面加上時間戳記防止快取
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRPNWnxfDY4g6QEACTULQzC1HHv8kmvUDvOX2lLHFQ9Zqo6_7QEkJe0hWc7WNUWZmBbVFASKM_L0iB2/pub?gid=1069936388&single=true&output=csv'
 
-const songs = computed(() => {
-  if (!rawCsv.value) return []
-  const { data } = Papa.parse(rawCsv.value, { header: true, skipEmptyLines: true })
-  return data
+// 2. 使用 $fetch 代替 useFetch 來獲取原始文字，避免 Nuxt 誤判格式
+const songs = ref([])
+const pending = ref(true)
+
+const loadData = async () => {
+  pending.value = true
+  try {
+    // 加入隨機參數 t，確保每次抓取都是最新的
+    const csvData = await $fetch(`${SHEET_CSV_URL}&t=${Date.now()}`)
+    
+    const parsed = Papa.parse(csvData, {
+      header: true,
+      skipEmptyLines: true
+    })
+    
+    // 這裡要確保你的試算表標題是 "Date", "Title", "Artist", "Link"
+    songs.value = parsed.data
+  } catch (err) {
+    console.error('資料抓取失敗:', err)
+  } finally {
+    pending.value = false
+  }
+}
+
+// 初始讀取
+onMounted(() => {
+  loadData()
 })
 
 const searchQuery = ref('')
 const selectedDate = ref('')
 
-// 輔助函式：確保日期字串能被正確解析為時間戳記
+// 輔助函式：處理 yyyy/mm/dd 排序
 const getTime = (dateStr) => {
   if (!dateStr) return 0
-  // 將 yyyy/m/d 轉換為 yyyy-mm-dd 格式以利 Date 解析
   return new Date(dateStr.replace(/\//g, '-')).getTime()
 }
 
-// 1. 下拉選單日期排序
+// 日期下拉選單排序 (由新到舊)
 const availableDates = computed(() => {
-  if (!songs.value) return []
-  const dates = [...new Set(songs.value.map(s => s.Date))]
-  // 使用時間戳記進行降序排序 (新 -> 舊)
+  if (!songs.value.length) return []
+  const dates = [...new Set(songs.value.map(s => s.Date).filter(Boolean))]
   return dates.sort((a, b) => getTime(b) - getTime(a))
 })
 
-// 2. 列表內容排序邏輯
+// 歌曲列表過濾與排序 (由新到舊)
 const filteredSongs = computed(() => {
-  if (!songs.value) return []
-  
   let result = [...songs.value]
 
-  // A. 關鍵字搜尋
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     result = result.filter(s => 
-      (s.Title && s.Title.toLowerCase().includes(q)) || 
-      (s.Artist && s.Artist.toLowerCase().includes(q))
+      (s.Title?.toLowerCase().includes(q)) || 
+      (s.Artist?.toLowerCase().includes(q))
     )
   }
 
-  // B. 日期篩選
   if (selectedDate.value) {
     result = result.filter(s => s.Date === selectedDate.value)
   }
 
-  // C. 核心修正：強制使用時間戳記排序
-  return result.sort((a, b) => {
-    const timeA = getTime(a.Date)
-    const timeB = getTime(b.Date)
-    return timeB - timeA // 降序排序：新的在前
-  })
+  // 確保依照日期由新到舊排序
+  return result.sort((a, b) => getTime(b.Date) - getTime(a.Date))
 })
 
-// 判斷是否顯示新日期標題
+// 計算該日期分組內的序號 (01, 02...)
+const getDailyIndex = (currentIndex) => {
+  const currentSong = filteredSongs.value[currentIndex]
+  if (!currentSong) return '01'
+  let count = 0
+  for (let i = 0; i <= currentIndex; i++) {
+    if (filteredSongs.value[i].Date === currentSong.Date) {
+      count++
+    }
+  }
+  return String(count).padStart(2, '0')
+}
+
 const isNewDate = (index) => {
   if (index === 0) return true
   return filteredSongs.value[index].Date !== filteredSongs.value[index - 1].Date
@@ -152,25 +177,5 @@ const isNewDate = (index) => {
 const clearFilters = () => {
   searchQuery.value = ''
   selectedDate.value = ''
-}
-
-/**
- * 計算該歌曲在當天日期組內的序號
- * @param {number} currentIndex - 當前歌曲在總列表中的索引
- */
-const getDailyIndex = (currentIndex) => {
-  const currentSong = filteredSongs.value[currentIndex]
-  if (!currentSong) return '01'
-
-  // 過濾出與當前歌曲日期相同，且在總列表中排在當前歌曲之前的歌曲數量
-  let count = 0
-  for (let i = 0; i <= currentIndex; i++) {
-    if (filteredSongs.value[i].Date === currentSong.Date) {
-      count++
-    }
-  }
-  
-  // 補零輸出，例如 01, 02...
-  return String(count).padStart(2, '0')
 }
 </script>
