@@ -56,7 +56,7 @@ div(class="min-h-screen bg-blue-50/80 text-slate-900 py-6 px-4 sm:px-6 font-sans
         //- 歌曲橫條 (純白底，深色字)
         div(class="group flex items-center bg-white border border-blue-200 hover:border-blue-600 px-4 py-4 transition-all rounded-xl shadow-sm hover:shadow-md")
           //- 序號 (調整為中灰色，避免干擾閱讀但保持可見)
-          div(class="text-xs font-mono text-slate-400 w-6 font-bold") {{ String(index + 1).padStart(2, '0') }}
+          div(class="text-xs font-mono text-slate-400 w-6 font-bold") {{ getDailyIndex(index) }}
           
           div(class="flex-1 min-w-0 ml-3")
             div(class="flex flex-col")
@@ -152,5 +152,25 @@ const isNewDate = (index) => {
 const clearFilters = () => {
   searchQuery.value = ''
   selectedDate.value = ''
+}
+
+/**
+ * 計算該歌曲在當天日期組內的序號
+ * @param {number} currentIndex - 當前歌曲在總列表中的索引
+ */
+const getDailyIndex = (currentIndex) => {
+  const currentSong = filteredSongs.value[currentIndex]
+  if (!currentSong) return '01'
+
+  // 過濾出與當前歌曲日期相同，且在總列表中排在當前歌曲之前的歌曲數量
+  let count = 0
+  for (let i = 0; i <= currentIndex; i++) {
+    if (filteredSongs.value[i].Date === currentSong.Date) {
+      count++
+    }
+  }
+  
+  // 補零輸出，例如 01, 02...
+  return String(count).padStart(2, '0')
 }
 </script>
