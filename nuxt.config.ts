@@ -6,4 +6,11 @@ export default defineNuxtConfig({
   tailwindcss: {
     cssPath: 'assets/css/main.css',
   },
+  app: {
+    baseURL: '/shiyu-song-list/', // 例如 '/my-music-list/'，如果是主域名則用 '/'
+    buildAssetsDir: 'assets',
+  },
+  routeRules: {
+    '/': { prerender: true }
+  }
 })

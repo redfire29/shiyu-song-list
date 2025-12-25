@@ -86,7 +86,17 @@ div(class="min-h-screen bg-blue-50/80 text-slate-900 py-6 px-4 sm:px-6 font-sans
 </template>
 
 <script setup>
-const { data: songs, pending, error } = await useFetch('/api/songs')
+import Papa from 'papaparse' // 記得 npm install papaparse
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRPNWnxfDY4g6QEACTULQzC1HHv8kmvUDvOX2lLHFQ9Zqo6_7QEkJe0hWc7WNUWZmBbVFASKM_L0iB2/pub?gid=1069936388&single=true&output=csv'
+
+const { data: rawCsv } = await useFetch(SHEET_URL)
+
+const songs = computed(() => {
+  if (!rawCsv.value) return []
+  const { data } = Papa.parse(rawCsv.value, { header: true, skipEmptyLines: true })
+  return data
+})
+
 const searchQuery = ref('')
 const selectedDate = ref('')
 
