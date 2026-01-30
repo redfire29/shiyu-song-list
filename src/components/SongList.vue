@@ -86,12 +86,12 @@ div(class="min-h-screen bg-blue-50/80 text-slate-900 py-6 px-4 sm:px-6 font-sans
 </template>
 
 <script setup>
+import { ref, computed, onMounted } from 'vue'
 import Papa from 'papaparse'
 
 // 1. 填入你提供的 CSV 連結，並在後面加上時間戳記防止快取
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRPNWnxfDY4g6QEACTULQzC1HHv8kmvUDvOX2lLHFQ9Zqo6_7QEkJe0hWc7WNUWZmBbVFASKM_L0iB2/pub?gid=1069936388&single=true&output=csv'
 
-// 2. 使用 $fetch 代替 useFetch 來獲取原始文字，避免 Nuxt 誤判格式
 const songs = ref([])
 const pending = ref(true)
 
@@ -99,7 +99,8 @@ const loadData = async () => {
   pending.value = true
   try {
     // 加入隨機參數 t，確保每次抓取都是最新的
-    const csvData = await $fetch(`${SHEET_CSV_URL}&t=${Date.now()}`)
+    const response = await fetch(`${SHEET_CSV_URL}&t=${Date.now()}`)
+    const csvData = await response.text()
     
     const parsed = Papa.parse(csvData, {
       header: true,

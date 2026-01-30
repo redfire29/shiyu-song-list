@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SongList from '../components/SongList.vue';
+---
+
+<Layout>
+	<SongList client:only="vue" />
+</Layout>
