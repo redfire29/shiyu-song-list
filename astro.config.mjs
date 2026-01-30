@@ -6,6 +6,8 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
+  site: 'https://redfire29.github.io',
+  base: '/shiyu-song-list',
   integrations: [vue()],
 
   vite: {
