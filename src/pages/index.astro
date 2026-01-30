@@ -1,8 +1,8 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import SongList from '../components/SongList.vue';
+import Layout from "../layouts/Layout.astro";
+import SongList from "../components/SongList.svelte";
 ---
 
 <Layout>
-	<SongList client:only="vue" />
+	<SongList client:only="svelte" />
 </Layout>
