@@ -9,7 +9,9 @@
   let songs = [];
   let pending = true;
   let searchQuery = "";
-  let selectedDate = "";
+  let selectedYear = "";
+  let selectedMonth = "";
+  let selectedDay = "";
 
   const loadData = async () => {
     pending = true;
@@ -42,12 +44,63 @@
     return new Date(dateStr.replace(/\//g, "-")).getTime();
   };
 
-  // 日期下拉選單排序 (由新到舊)
-  $: availableDates = (() => {
+  // 日期提取輔助
+  const parseDate = (dateStr) => {
+    const parts = dateStr.replace(/\//g, "-").split("-");
+    if (parts.length < 3) return null;
+    return {
+      year: parts[0],
+      month: parts[1],
+      day: parts[2],
+    };
+  };
+
+  // 年份下拉選單 (由新到舊)
+  $: availableYears = (() => {
     if (!songs.length) return [];
-    const dates = [...new Set(songs.map((s) => s.Date).filter(Boolean))];
-    return dates.sort((a, b) => getTime(b) - getTime(a));
+    const years = new Set();
+    songs.forEach((s) => {
+      const d = parseDate(s.Date);
+      if (d) years.add(d.year);
+    });
+    return [...years].sort((a, b) => Number(b) - Number(a));
   })();
+
+  // 月份下拉選單 (根據選中的年份或是全部)
+  $: availableMonths = (() => {
+    const months = new Set();
+    songs.forEach((s) => {
+      const d = parseDate(s.Date);
+      if (!d) return;
+      if (selectedYear && d.year !== selectedYear) return;
+      months.add(d.month);
+    });
+    return [...months].sort((a, b) => Number(a) - Number(b));
+  })();
+
+  // 日期下拉選單 (根據選中的年月)
+  $: availableDays = (() => {
+    const days = new Set();
+    songs.forEach((s) => {
+      const d = parseDate(s.Date);
+      if (!d) return;
+      if (selectedYear && d.year !== selectedYear) return;
+      if (selectedMonth && d.month !== selectedMonth) return;
+      days.add(d.day);
+    });
+    return [...days].sort((a, b) => Number(a) - Number(b));
+  })();
+
+  // 連動重置：年份改變時，清空月、日 (如果不合法)
+  // 注意：這裡簡單處理，只要換年就清空月日，換月清空日，體驗比較直覺
+  const handleYearChange = () => {
+    selectedMonth = "";
+    selectedDay = "";
+  };
+
+  const handleMonthChange = () => {
+    selectedDay = "";
+  };
 
   // 歌曲列表過濾與排序 (由新到舊)
   $: filteredSongs = (() => {
@@ -62,9 +115,27 @@
       );
     }
 
-    if (selectedDate) {
-      result = result.filter((s) => s.Date === selectedDate);
+    if (selectedYear) {
+      result = result.filter((s) => {
+        const d = parseDate(s.Date);
+        return d && d.year === selectedYear;
+      });
     }
+
+    if (selectedMonth) {
+      result = result.filter((s) => {
+        const d = parseDate(s.Date);
+        return d && d.month === selectedMonth;
+      });
+    }
+
+    if (selectedDay) {
+      result = result.filter((s) => {
+        const d = parseDate(s.Date);
+        return d && d.day === selectedDay;
+      });
+    }
+
     // 確保依照日期由新到舊排序
     return result.sort((a, b) => getTime(b.Date) - getTime(a.Date));
   })();
@@ -84,7 +155,9 @@
 
   const clearFilters = () => {
     searchQuery = "";
-    selectedDate = "";
+    selectedYear = "";
+    selectedMonth = "";
+    selectedDay = "";
   };
 </script>
 
@@ -128,21 +201,61 @@
             />
           </div>
 
-          <!-- 日付フィルター (文字顏色加深) -->
-          <div class="w-full sm:w-44">
+          <!-- 年份 Filters -->
+          <div class="w-full sm:w-24">
             <label
-              for="date-filter"
+              for="year-filter"
               class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
-              >Date / 日付</label
+              >Year / 年</label
             >
             <select
-              id="date-filter"
-              bind:value={selectedDate}
+              id="year-filter"
+              bind:value={selectedYear}
+              on:change={handleYearChange}
               class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
             >
-              <option value="">すべて表示 ({availableDates.length})</option>
-              {#each availableDates as date}
-                <option value={date}>{date}</option>
+              <option value="">Year</option>
+              {#each availableYears as year}
+                <option value={year}>{year}</option>
+              {/each}
+            </select>
+          </div>
+
+          <!-- 月份 Filters -->
+          <div class="w-full sm:w-20">
+            <label
+              for="month-filter"
+              class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
+              >Month / 月</label
+            >
+            <select
+              id="month-filter"
+              bind:value={selectedMonth}
+              on:change={handleMonthChange}
+              class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
+            >
+              <option value="">Month</option>
+              {#each availableMonths as month}
+                <option value={month}>{month}</option>
+              {/each}
+            </select>
+          </div>
+
+          <!-- 日期 Filters -->
+          <div class="w-full sm:w-20">
+            <label
+              for="day-filter"
+              class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
+              >Day / 日</label
+            >
+            <select
+              id="day-filter"
+              bind:value={selectedDay}
+              class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
+            >
+              <option value="">Day</option>
+              {#each availableDays as day}
+                <option value={day}>{day}</option>
               {/each}
             </select>
           </div>
