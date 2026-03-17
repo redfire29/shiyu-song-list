@@ -12,6 +12,10 @@
   let selectedYear = "";
   let selectedMonth = "";
   let selectedDay = "";
+  let selectedVideoId = "";
+  let isPlayerVisible = false;
+  let isMinimized = false;
+  let selectedStartTime = 0;
 
   const loadData = async () => {
     pending = true;
@@ -159,6 +163,55 @@
     selectedMonth = "";
     selectedDay = "";
   };
+
+  const extractVideoId = (url) => {
+    if (!url) return { id: null, time: 0 };
+    const regExp =
+      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    const id = match && match[2].length === 11 ? match[2] : null;
+
+    // 解析時間參數 t
+    let time = 0;
+    const urlObj = new URL(url.replace(/&amp;/g, "&"));
+    const t = urlObj.searchParams.get("t");
+    if (t) {
+      // 處理 1h2m3s 格式或是純秒數
+      const hmsMatch = t.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/);
+      if (hmsMatch && (hmsMatch[1] || hmsMatch[2] || hmsMatch[3])) {
+        time =
+          (parseInt(hmsMatch[1]) || 0) * 3600 +
+          (parseInt(hmsMatch[2]) || 0) * 60 +
+          (parseInt(hmsMatch[3]) || 0);
+      } else {
+        time = parseInt(t) || 0;
+      }
+    }
+    return { id, time };
+  };
+
+  const playVideo = (link) => {
+    const { id, time } = extractVideoId(link);
+    if (id) {
+      // 如果影片 ID 相同但秒數不同，強制更新 iframe
+      if (selectedVideoId === id) {
+        selectedVideoId = ""; // 觸發 Svelte 重新渲染
+        setTimeout(() => {
+          selectedVideoId = id;
+          selectedStartTime = time;
+          isPlayerVisible = true;
+          isMinimized = false;
+        }, 10);
+      } else {
+        selectedVideoId = id;
+        selectedStartTime = time;
+        isPlayerVisible = true;
+        isMinimized = false;
+      }
+    } else if (link) {
+      window.open(link, "_blank");
+    }
+  };
 </script>
 
 <!-- 背景稍微調深一點點，讓白色卡片更跳脫出來 -->
@@ -174,9 +227,20 @@
       <a
         href="https://www.youtube.com/@shiyumarurun"
         target="_blank"
-        class="text-blue-800 my-2 block text-2xl"
-        >https://www.youtube.com/@shiyumarurun</a
+        class="inline-block text-blue-800 hover:text-red-600 transition-colors my-2"
+        aria-label="YouTube Channel"
       >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="w-10 h-10"
+          fill="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"
+          />
+        </svg>
+      </a>
     </div>
 
     <!-- 固定在頂部的控制面板 (加強邊框與對比) -->
@@ -184,9 +248,9 @@
       class="sticky top-0 z-20 pt-2 pb-4 -mx-4 px-4 bg-white border-b-4 border-blue-200 shadow-lg"
     >
       <div class="max-w-2xl mx-auto">
-        <div class="flex flex-wrap gap-3 items-end">
+        <div class="flex max-md:flex-col flex-wrap gap-3 md:items-end">
           <!-- 検索 (文字顏色加深) -->
-          <div class="flex-1 min-w-[180px]">
+          <div class="flex-1 max-md:w-full min-w-[180px]">
             <label
               for="search"
               class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
@@ -201,63 +265,65 @@
             />
           </div>
 
-          <!-- 年份 Filters -->
-          <div class="w-full sm:w-24">
-            <label
-              for="year-filter"
-              class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
-              >Year / 年</label
-            >
-            <select
-              id="year-filter"
-              bind:value={selectedYear}
-              on:change={handleYearChange}
-              class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
-            >
-              <option value="">Year</option>
-              {#each availableYears as year}
-                <option value={year}>{year}</option>
-              {/each}
-            </select>
-          </div>
+          <div class="flex flex-1 w-full sm:w-auto gap-2">
+            <!-- 年份 Filters -->
+            <div class="flex-1 sm:w-24">
+              <label
+                for="year-filter"
+                class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
+                >Year / 年</label
+              >
+              <select
+                id="year-filter"
+                bind:value={selectedYear}
+                on:change={handleYearChange}
+                class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
+              >
+                <option value="">Year</option>
+                {#each availableYears as year}
+                  <option value={year}>{year}</option>
+                {/each}
+              </select>
+            </div>
 
-          <!-- 月份 Filters -->
-          <div class="w-full sm:w-20">
-            <label
-              for="month-filter"
-              class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
-              >Month / 月</label
-            >
-            <select
-              id="month-filter"
-              bind:value={selectedMonth}
-              on:change={handleMonthChange}
-              class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
-            >
-              <option value="">Month</option>
-              {#each availableMonths as month}
-                <option value={month}>{month}</option>
-              {/each}
-            </select>
-          </div>
+            <!-- 月份 Filters -->
+            <div class="flex-1 sm:w-20">
+              <label
+                for="month-filter"
+                class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
+                >Month / 月</label
+              >
+              <select
+                id="month-filter"
+                bind:value={selectedMonth}
+                on:change={handleMonthChange}
+                class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
+              >
+                <option value="">Month</option>
+                {#each availableMonths as month}
+                  <option value={month}>{month}</option>
+                {/each}
+              </select>
+            </div>
 
-          <!-- 日期 Filters -->
-          <div class="w-full sm:w-20">
-            <label
-              for="day-filter"
-              class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
-              >Day / 日</label
-            >
-            <select
-              id="day-filter"
-              bind:value={selectedDay}
-              class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
-            >
-              <option value="">Day</option>
-              {#each availableDays as day}
-                <option value={day}>{day}</option>
-              {/each}
-            </select>
+            <!-- 日期 Filters -->
+            <div class="flex-1 sm:w-20">
+              <label
+                for="day-filter"
+                class="block text-[11px] font-black text-blue-800 uppercase mb-1 ml-1 tracking-widest"
+                >Day / 日</label
+              >
+              <select
+                id="day-filter"
+                bind:value={selectedDay}
+                class="w-full rounded-lg border-2 border-blue-200 p-2 text-sm outline-none focus:border-blue-600 bg-blue-50/30 text-slate-900 font-bold cursor-pointer appearance-none"
+              >
+                <option value="">Day</option>
+                {#each availableDays as day}
+                  <option value={day}>{day}</option>
+                {/each}
+              </select>
+            </div>
           </div>
 
           <!-- リセット (按鈕顏色加強) -->
@@ -297,8 +363,11 @@
           {/if}
 
           <!-- 歌曲橫條 (純白底，深色字) -->
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-static-element-interactions -->
           <div
-            class="group flex items-center bg-white border border-blue-200 hover:border-blue-600 px-4 py-4 transition-all rounded-xl shadow-sm hover:shadow-md"
+            class="group flex items-center bg-white border border-blue-200 hover:border-blue-600 px-4 py-4 transition-all rounded-xl shadow-sm hover:shadow-md cursor-pointer"
+            on:click={() => playVideo(song.Link)}
           >
             <!-- 序號 (調整為中灰色，避免干擾閱讀但保持可見) -->
             <div class="text-xs font-mono text-slate-400 w-6 font-bold">
@@ -327,6 +396,7 @@
               target="_blank"
               class="ml-4 p-2 text-blue-500 hover:text-red-600 transition-colors"
               title="YouTubeで再生"
+              on:click|stopPropagation
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -363,3 +433,104 @@
     </div>
   </div>
 </div>
+
+<!-- YouTube 影片浮動小視窗 -->
+{#if isPlayerVisible && selectedVideoId}
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div
+    class="fixed bottom-6 right-6 z-50 transition-all duration-500 ease-out bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border-2 border-blue-100 overflow-hidden {isMinimized
+      ? 'w-64'
+      : 'w-[90vw] sm:w-[500px]'}"
+  >
+    <!-- 標題欄 -->
+    <div
+      class="flex items-center justify-between px-4 py-3 bg-blue-800 text-white cursor-pointer"
+      on:click={() => (isMinimized = !isMinimized)}
+      on:keydown={(e) => e.key === "Enter" && (isMinimized = !isMinimized)}
+    >
+      <div class="flex items-center gap-2 overflow-hidden">
+        <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+        <span class="text-[10px] font-black uppercase tracking-widest truncate"
+          >{isMinimized ? "Minimized" : "Now Playing"}</span
+        >
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- 最小化/還原按鈕 -->
+        <button
+          on:click|stopPropagation={() => (isMinimized = !isMinimized)}
+          class="text-blue-200 hover:text-white transition-colors"
+          title={isMinimized ? "還原" : "最小化"}
+        >
+          {#if isMinimized}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
+              />
+            </svg>
+          {:else}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M18 12H6"
+              />
+            </svg>
+          {/if}
+        </button>
+        <!-- 關閉按鈕 -->
+        <button
+          on:click|stopPropagation={() => (isPlayerVisible = false)}
+          class="text-blue-200 hover:text-red-400 transition-colors"
+          aria-label="Close player"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 影片內容區 (最小化時保持在 DOM 中以持續播放) -->
+    <div
+      class="aspect-video bg-black shadow-inner {isMinimized
+        ? 'hidden'
+        : 'block'}"
+    >
+      <iframe
+        title="YouTube player"
+        class="w-full h-full"
+        src={`https://www.youtube.com/embed/${selectedVideoId}?autoplay=1&start=${selectedStartTime}`}
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+      ></iframe>
+    </div>
+  </div>
+{/if}
