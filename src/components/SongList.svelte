@@ -6,6 +6,9 @@
   const SHEET_CSV_URL =
     "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPNWnxfDY4g6QEACTULQzC1HHv8kmvUDvOX2lLHFQ9Zqo6_7QEkJe0hWc7WNUWZmBbVFASKM_L0iB2/pub?gid=1069936388&single=true&output=csv";
 
+  // 會員限定 API
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbx-jr8pDu7g3OfM1u0_S-MLp_BslRl54Y0nruB8MMgdrsFFLZ2waqiLsEUGEFJSb6aw/exec";
+
   let songs = [];
   let pending = true;
   let searchQuery = "";
@@ -20,6 +23,8 @@
   // 新增 UI/UX 優化狀態
   let favoriteSongs = [];
   let showOnlyFavorites = false;
+  let isMemberUnlocked = false;
+  let showOnlyMembers = false;
   let currentPlayingLink = "";
   let currentPlayingSong = null;
 
@@ -51,7 +56,42 @@
       });
 
       // 這裡要確保你的試算表標題是 "Date", "Title", "Artist", "Link"
-      songs = parsed.data;
+      let baseSongs = parsed.data.map(s => ({ ...s, isMemberOnly: false }));
+
+      // 檢查網址密碼並載入會員歌單
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const pwd = urlParams.get("pwd");
+        if (pwd) {
+          try {
+            const gasResponse = await fetch(`${GAS_URL}?pwd=${pwd}`);
+            const gasText = await gasResponse.text();
+            if (!gasText.includes("Access Denied") && gasText.trim().startsWith("[")) {
+              const memberData = JSON.parse(gasText);
+              const memberSongs = memberData.map(s => {
+                let formattedDate = s.Date;
+                // 自動處理 Google API 回傳的 ISO 時間格式 (例如 "2024-09-08T16:00:00.000Z")
+                if (formattedDate && formattedDate.includes("T")) {
+                  const d = new Date(formattedDate);
+                  if (!isNaN(d.getTime())) {
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    formattedDate = `${yyyy}/${mm}/${dd}`;
+                  }
+                }
+                return { ...s, Date: formattedDate, isMemberOnly: true };
+              });
+              baseSongs = [...baseSongs, ...memberSongs];
+              isMemberUnlocked = true;
+            }
+          } catch (e) {
+            console.error("載入會員歌單失敗:", e);
+          }
+        }
+      }
+
+      songs = baseSongs;
     } catch (err) {
       console.error("資料抓取失敗:", err);
     } finally {
@@ -185,6 +225,10 @@
       result = result.filter((s) => favoriteSongs.includes(s.Link));
     }
 
+    if (showOnlyMembers) {
+      result = result.filter((s) => s.isMemberOnly);
+    }
+
     if (searchQuery) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter(
@@ -238,6 +282,7 @@
     selectedMonth = "";
     selectedDay = "";
     showOnlyFavorites = false;
+    showOnlyMembers = false;
   };
 
   const extractVideoId = (url) => {
@@ -268,6 +313,19 @@
 
   const playVideo = (song) => {
     const link = song.Link;
+    
+    // 會員限定影片無法使用 iframe 嵌入，直接另開新視窗
+    if (song.isMemberOnly) {
+      // 關閉目前網頁上的播放器，避免聲音重疊
+      isPlayerVisible = false;
+      // 依然設定為目前播放歌曲，讓介面保持高亮與跳動動畫
+      currentPlayingLink = link;
+      currentPlayingSong = song;
+      
+      window.open(link, "_blank");
+      return;
+    }
+
     const { id, time } = extractVideoId(link);
     currentPlayingLink = link;
     currentPlayingSong = song;
@@ -441,6 +499,16 @@
               <span>{showOnlyFavorites ? 'すべて表示' : 'お気に入り'}</span>
             </button>
 
+            <!-- 👑 會員專屬 -->
+            {#if isMemberUnlocked}
+              <button
+                on:click={() => showOnlyMembers = !showOnlyMembers}
+                class="flex-1 md:flex-none px-4 py-2.5 border-2 transition-all active:scale-95 flex items-center justify-center gap-1.5 text-xs font-black rounded-lg cursor-pointer {showOnlyMembers ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-blue-100 bg-white/50 text-blue-800 hover:bg-blue-50/20 hover:border-blue-400'}"
+              >
+                <span>{showOnlyMembers ? 'すべて表示' : '👑 メンバー'}</span>
+              </button>
+            {/if}
+
             <!-- リセット -->
             <button
               on:click={clearFilters}
@@ -518,11 +586,16 @@
             <div class="flex-1 min-w-0 ml-2">
               <div class="flex flex-col">
                 <!-- 歌曲標題：深色 Slate-900 -->
-                <h3
-                  class="text-base font-black truncate transition-colors {currentPlayingLink === song.Link ? 'text-blue-800' : 'text-slate-900 group-hover:text-blue-600'}"
-                >
-                  {song.Title}
-                </h3>
+                <div class="flex items-center gap-2">
+                  <h3
+                    class="text-base font-black truncate transition-colors {currentPlayingLink === song.Link ? 'text-blue-800' : 'text-slate-900 group-hover:text-blue-600'}"
+                  >
+                    {song.Title}
+                  </h3>
+                  {#if song.isMemberOnly}
+                    <span class="px-1.5 py-0.5 bg-amber-100 text-amber-700 border border-amber-300 text-[10px] font-black rounded shadow-sm flex-shrink-0 tracking-widest uppercase">Member</span>
+                  {/if}
+                </div>
                 <!-- 歌手名稱：調深至 Blue-700 -->
                 <span
                   class="text-xs font-bold text-blue-700 mt-0.5 truncate uppercase tracking-tight"
