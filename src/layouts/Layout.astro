@@ -1,24 +1,38 @@
 ---
+import '../styles/main.css';
+
 interface Props {
 	title?: string;
+	description?: string;
 }
 
-const { title = 'しゆ。Song List' } = Astro.props;
-import '../styles/main.css';
+const {
+	title = 'しゆ。Song List',
+	description = 'しゆ (Shiyu) の歌枠・歌唱楽曲アーカイブリスト。曲名・アーティスト・日付での検索、お気に入り登録、YouTube 再生に対応しています。',
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const faviconSvg = `${base}favicon.svg`;
+const faviconIco = `${base}favicon.ico`;
+const siteUrl = 'https://redfire29.github.io/shiyu-song-list/';
 ---
 
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="ja">
 	<head>
 		<meta charset="UTF-8" />
-		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+		<link rel="icon" type="image/svg+xml" href={faviconSvg} />
+		<link rel="icon" type="image/x-icon" href={faviconIco} />
 		<meta name="generator" content={Astro.generator} />
-		<meta name="apple-mobile-web-app-title" content="" />
-		<meta property="og:url" content="https://redfire29.github.io/shiyu-song-list/" />
+		<meta name="description" content={description} />
+		<meta name="apple-mobile-web-app-title" content={title} />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content={siteUrl} />
 		<meta property="og:site_name" content="しゆ。Song List" />
-		<link rel="canonical" href="https://redfire29.github.io/shiyu-song-list/" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<link rel="canonical" href={siteUrl} />
 		<title>{title}</title>
 	</head>
 	<body>
