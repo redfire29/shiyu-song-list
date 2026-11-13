@@ -22,3 +22,12 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# python & whisper audio/transcript temp
+.venv/
+.temp_audio/
+transcripts/
+*.m4a
+*.mp3
+*.wav
+

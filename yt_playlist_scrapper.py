@@ -25,12 +25,20 @@ def get_taiwan_date(info):
     return f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}", raw_date
 
 def scrape_youtube_playlist(url):
+    # 自動清理終端機貼上時產生的反斜線轉義字元 (如 watch\?v\= -> watch?v=)
+    url = url.replace(r"\?", "?").replace(r"\=", "=").replace(r"\&", "&").replace("\\", "").strip()
+
     ydl_opts = {
         'getcomments': True,
         'skip_download': True,
         'extract_flat': False,
         'max_comments': 100,
-        'quiet': True
+        'quiet': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'mweb']
+            }
+        }
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -73,6 +81,11 @@ def scrape_youtube_playlist(url):
                 df.to_csv(filename, index=False, encoding='utf-8-sig')
                 print(f"--- 檔案已存: {filename} ---")
                 return True
+            else:
+                print(f"⚠️ 提示: 在該影片的官方章節、說明欄與前 100 則留言中未找到任何時間軸。")
+                print(f"   若該影片無人標記時間軸，請改用 Whisper 工具聽音轉錄：")
+                print(f"   -> python yt_whisper_transcriber.py \"{url}\"")
+                return False
         except Exception as e:
             print(f"   -> 錯誤: {e}")
     return False
